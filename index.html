@@ -1,0 +1,998 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Inflatable Letters</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Rubik:wght@900&family=Fredoka:wght@700&family=Archivo+Black&family=Bagel+Fat+One&family=Bungee&family=Noto+Sans+SC:wght@900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #7cc4f5;
+    --panel: rgba(255,255,255,.82);
+    --ink: #141414;
+    --muted: #6b6b6b;
+    --line: rgba(0,0,0,.1);
+    --accent: #ffd23f;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    font-family: "Rubik", system-ui, -apple-system, "PingFang SC", sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    overflow: hidden;
+    display: flex;
+  }
+  body::before {
+    content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .28; mix-blend-mode: overlay;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  #stage { position: relative; flex: 1; min-width: 0; height: 100%; }
+  #stage canvas { display: block; width: 100%; height: 100%; touch-action: none; cursor: grab; }
+  #stage canvas:active { cursor: grabbing; }
+  .brand {
+    position: absolute; left: 20px; top: 16px; font-weight: 900; letter-spacing: .02em; font-size: 15px;
+    display: flex; gap: 8px; align-items: center; user-select: none;
+  }
+  .brand b { background: var(--ink); color: var(--accent); padding: 3px 8px; border-radius: 6px; }
+  .hint { position: absolute; left: 0; right: 0; bottom: 14px; text-align: center; font-size: 12px; opacity: .6; pointer-events: none; font-family: system-ui, sans-serif; }
+  #loading { position: absolute; inset: 0; display: grid; place-items: center; font-weight: 900; font-size: 20px; }
+
+  aside {
+    width: 320px; flex: none; height: 100%; overflow-y: auto; padding: 18px 18px 24px;
+    background: var(--panel); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-left: 1px solid var(--line);
+    font-family: system-ui, -apple-system, "PingFang SC", sans-serif; font-size: 13px;
+  }
+  .sec { margin-bottom: 16px; }
+  .sec > .t { font-size: 11px; font-weight: 700; letter-spacing: .08em; color: var(--muted); text-transform: uppercase; margin-bottom: 8px; display: flex; justify-content: space-between; }
+  input[type=text], select {
+    width: 100%; font: inherit; font-size: 15px; padding: 9px 11px; border-radius: 10px; border: 1px solid var(--line); background: #fff; color: var(--ink);
+  }
+  input[type=text] { font-family: "Rubik", sans-serif; font-weight: 900; font-size: 18px; letter-spacing: .04em; }
+  #chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip {
+    min-width: 34px; height: 34px; padding: 0 8px; border-radius: 9px; border: 1.5px solid var(--line); background: #fff;
+    font: 900 15px "Rubik", sans-serif; cursor: pointer; color: var(--ink);
+  }
+  .chip.all { font: 700 12px system-ui, sans-serif; }
+  .chip.on { border-color: var(--ink); background: var(--ink); color: #fff; }
+  .grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 6px; }
+  .sw { aspect-ratio: 1; border-radius: 10px; border: 2px solid transparent; padding: 0; cursor: pointer; overflow: hidden; background: #fff; box-shadow: 0 0 0 1px var(--line); }
+  .sw canvas { width: 100%; height: 100%; display: block; }
+  .sw.on { border-color: var(--ink); }
+  .seg { display: grid; grid-template-columns: repeat(4, 1fr); gap: 4px; background: rgba(0,0,0,.06); padding: 3px; border-radius: 10px; }
+  .seg button { border: 0; background: transparent; padding: 7px 0; border-radius: 8px; font: 600 12px system-ui, sans-serif; cursor: pointer; color: var(--ink); }
+  .seg button.on { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+  .pals { display: grid; grid-template-columns: repeat(8, 1fr); gap: 5px; margin-bottom: 8px; }
+  .pal { aspect-ratio: 1; border-radius: 50%; border: 0; cursor: pointer; box-shadow: 0 0 0 1px var(--line); }
+  .colors { display: flex; gap: 8px; align-items: center; }
+  .colors label { display: flex; align-items: center; gap: 6px; flex: 1; color: var(--muted); white-space: nowrap; }
+  input[type=color] { width: 100%; height: 30px; border: 1px solid var(--line); border-radius: 8px; padding: 2px; background: #fff; cursor: pointer; }
+  .range { display: grid; grid-template-columns: 64px 1fr 34px; align-items: center; gap: 8px; margin-bottom: 6px; color: var(--muted); }
+  .range output { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+  input[type=range] { width: 100%; accent-color: var(--ink); }
+  .row { display: flex; gap: 8px; }
+  .btn { flex: 1; padding: 11px; border-radius: 11px; border: 0; font: 700 13px system-ui, sans-serif; cursor: pointer; background: #fff; box-shadow: 0 0 0 1px var(--line); color: var(--ink); }
+  .btn.primary { background: var(--ink); color: #fff; box-shadow: none; }
+  .btn:active { transform: translateY(1px); }
+
+  .seg.two { grid-template-columns: 1fr 1fr; }
+  .seg.two button { font-size: 13px; padding: 9px 0; }
+  body[data-mode="photo"] .only-text, body[data-mode="text"] .only-photo { display: none !important; }
+  .drop {
+    display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 16px 10px; border-radius: 12px; cursor: pointer;
+    border: 1.5px dashed rgba(0,0,0,.25); background: #fff; text-align: center;
+  }
+  .drop b { font-size: 14px; }
+  .drop span { color: var(--muted); font-size: 12px; }
+  .drop:hover { border-color: var(--ink); }
+  .samples { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+  .samples button { aspect-ratio: 1; font-size: 22px; border-radius: 10px; border: 0; background: #fff; box-shadow: 0 0 0 1px var(--line); cursor: pointer; }
+  .cut { display: flex; gap: 10px; align-items: center; margin-top: 10px; }
+  .cut canvas {
+    width: 72px; height: 72px; border-radius: 10px; flex: none; box-shadow: 0 0 0 1px var(--line);
+    background: repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 0 0 / 12px 12px;
+  }
+  .note { color: var(--muted); font-size: 12px; line-height: 1.5; }
+  #stage.dragging::after { content: "松开以上传照片"; position: absolute; inset: 12px; border: 3px dashed var(--ink); border-radius: 18px; display: grid; place-items: center; font-weight: 900; font-size: 20px; background: rgba(255,255,255,.35); }
+
+  @media (max-width: 760px) {
+    body { flex-direction: column; }
+    #stage { height: 52vh; flex: none; }
+    aside { width: 100%; height: 48vh; border-left: 0; border-top: 1px solid var(--line); padding: 14px 16px 24px; }
+    .grid { grid-template-columns: repeat(10, 1fr); }
+  }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body data-mode="text">
+<div id="stage">
+  <div class="brand"><b>PUFF</b> 充气字母实验室</div>
+  <div id="loading">充气中…</div>
+  <div class="hint">拖拽旋转 · 滚轮缩放 · 点击字母戳一下并选中它</div>
+</div>
+<aside>
+  <div class="sec">
+    <div class="seg two" id="mode"><button data-m="text" class="on">文字气球</button><button data-m="photo">照片气球</button></div>
+  </div>
+  <div class="sec only-photo">
+    <div class="t">照片</div>
+    <label class="drop"><input type="file" id="file" accept="image/*" hidden><b>上传照片</b><span>或直接拖到左侧画布 · 透明背景 PNG 效果最好</span></label>
+    <div class="cut"><canvas id="cutPrev" width="144" height="144"></canvas><div class="note" id="photoNote">还没有照片，先试试下面的示例。</div></div>
+  </div>
+  <div class="sec only-photo">
+    <div class="t">示例</div>
+    <div class="samples" id="samples"></div>
+  </div>
+  <div class="sec only-photo">
+    <div class="t">抠图</div>
+    <div class="range"><span>背景容差</span><input type="range" id="tol" min="10" max="160" step="5" value="70"><output id="tolV">70</output></div>
+    <button class="btn" id="ai" style="width:100%">✨ AI 智能抠图（首次需下载模型）</button>
+  </div>
+  <div class="sec only-text">
+    <div class="t">文字</div>
+    <input type="text" id="text" maxlength="12" value="RAW!" spellcheck="false">
+  </div>
+  <div class="sec only-text">
+    <div class="t">字体</div>
+    <select id="font">
+      <option value="rubik">Rubik Black</option>
+      <option value="bagel">Bagel Fat One</option>
+      <option value="fredoka">Fredoka</option>
+      <option value="archivo">Archivo Black</option>
+      <option value="bungee">Bungee</option>
+      <option value="noto">Noto Sans SC（中文）</option>
+    </select>
+  </div>
+  <div class="sec only-text">
+    <div class="t"><span>编辑对象</span><span id="selLabel"></span></div>
+    <div id="chips"></div>
+  </div>
+  <div class="sec only-text">
+    <div class="t">图案 Pattern</div>
+    <div class="grid" id="patterns"></div>
+  </div>
+  <div class="sec">
+    <div class="t">材质</div>
+    <div class="seg" id="finishes"></div>
+  </div>
+  <div class="sec only-text">
+    <div class="t">配色</div>
+    <div class="pals" id="pals"></div>
+    <div class="colors">
+      <label>底色 <input type="color" id="c1"></label>
+      <label>图案 <input type="color" id="c2"></label>
+    </div>
+  </div>
+  <div class="sec">
+    <div class="t">参数</div>
+    <div class="range only-text"><span>图案缩放</span><input type="range" id="pscale" min="0.4" max="3" step="0.05"><output id="pscaleV"></output></div>
+    <div class="range"><span>膨胀度</span><input type="range" id="puff" min="0.4" max="1.5" step="0.05" value="1"><output id="puffV"></output></div>
+    <div class="range"><span>褶皱</span><input type="range" id="wrinkle" min="0" max="1" step="0.05" value="0.45"><output id="wrinkleV"></output></div>
+    <div class="range"><span>背景</span><input type="color" id="bg" value="#7cc4f5" style="grid-column: span 2"></div>
+  </div>
+  <div class="row">
+    <button class="btn" id="rand">🎲 随机风格</button>
+    <button class="btn primary" id="save">导出 PNG</button>
+  </div>
+</aside>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+/* ---------------- config ---------------- */
+const FONTS = {
+  rubik:   ['900', '"Rubik"'],
+  bagel:   ['400', '"Bagel Fat One"'],
+  fredoka: ['700', '"Fredoka"'],
+  archivo: ['400', '"Archivo Black"'],
+  bungee:  ['400', '"Bungee"'],
+  noto:    ['900', '"Noto Sans SC"'],
+};
+const FS = 220;        // glyph raster size (px)
+const PAD = 48;        // raster padding
+const K = 1 / 100;     // px -> world
+const GRID = 2;        // mesh grid step (px)
+const THICK = 14;      // outline thickening (px)
+const BLUR_R = 3;      // box blur radius, 3 passes -> ~gaussian sigma 3.46
+const PHOTO_RES = 360; // photo raster size (px, long side)
+const PHOTO_BLUR = 5;
+
+const PATTERNS = ['solid', 'checker', 'grid', 'dots', 'confetti', 'stripes', 'hearts', 'stars', 'zigzag', 'gingham'];
+const FINISHES = { glossy: '光面', foil: '铝膜', jelly: '果冻', matte: '哑光' };
+const PALETTES = [
+  ['#ffffff', '#111111'], ['#ffd23f', '#ff4d2e'], ['#cfeaff', '#ff3b8d'], ['#1a1a1a', '#3a3a3a'],
+  ['#ff8fc7', '#ffffff'], ['#7cf0b5', '#1f6b4f'], ['#b18cff', '#fff27a'], ['#ff6b3d', '#2c2cff'],
+  ['#e9e9ef', '#9aa3b5'], ['#ffc2a8', '#ff2d55'], ['#2346ff', '#ffd23f'], ['#ff2d55', '#ffe0ea'],
+  ['#c8ff3d', '#111111'], ['#ffb800', '#ffffff'], ['#9be7ff', '#0b63ff'], ['#f4e3c1', '#c0392b'],
+];
+const CONFETTI = ['#ff3b3b', '#ffcc00', '#22c55e', '#3b82f6', '#a855f7', '#ff7ab6', '#ff8a00'];
+
+const DEFAULT_STYLES = [
+  { pattern: 'checker', finish: 'glossy', c1: '#ffffff', c2: '#111111', scale: 1.6 },
+  { pattern: 'grid', finish: 'glossy', c1: '#ffd23f', c2: '#ff4d2e', scale: 1.1 },
+  { pattern: 'confetti', finish: 'jelly', c1: '#cfeaff', c2: '#ff3b8d', scale: 1.1 },
+  { pattern: 'solid', finish: 'glossy', c1: '#141414', c2: '#3a3a3a', scale: 1 },
+];
+
+/* ---------------- state ---------------- */
+const state = {
+  text: 'RAW!',
+  font: 'rubik',
+  puff: 1,
+  wrinkle: 0.45,
+  styles: [],        // per char index
+  sel: 'all',
+  mode: 'text',
+};
+let rngSeed = 7;
+const rand = () => ((rngSeed = (rngSeed * 16807) % 2147483647) / 2147483647);
+const pick = a => a[Math.floor(Math.random() * a.length)];
+
+function randomStyle() {
+  const [c1, c2] = pick(PALETTES);
+  const finish = pick(['glossy', 'glossy', 'glossy', 'foil', 'jelly', 'matte']);
+  return { pattern: pick(PATTERNS), finish, c1, c2, scale: +(0.9 + Math.random() * 0.9).toFixed(2) };
+}
+function ensureStyles() {
+  const chars = [...state.text];
+  for (let i = 0; i < chars.length; i++) {
+    if (!state.styles[i]) state.styles[i] = i < DEFAULT_STYLES.length ? { ...DEFAULT_STYLES[i] } : randomStyle();
+  }
+  state.styles.length = Math.max(chars.length, 0);
+  if (state.sel !== 'all' && state.sel >= chars.length) state.sel = 'all';
+}
+
+/* ---------------- glyph -> signed distance field ---------------- */
+function edt1d(f, d, v, z, n) {
+  let k = 0; v[0] = 0; z[0] = -1e20; z[1] = 1e20;
+  for (let q = 1; q < n; q++) {
+    let s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]);
+    while (s <= z[k]) { k--; s = ((f[q] + q * q) - (f[v[k]] + v[k] * v[k])) / (2 * q - 2 * v[k]); }
+    k++; v[k] = q; z[k] = s; z[k + 1] = 1e20;
+  }
+  k = 0;
+  for (let q = 0; q < n; q++) { while (z[k + 1] < q) k++; d[q] = (q - v[k]) * (q - v[k]) + f[v[k]]; }
+}
+function edt(grid, W, H) {
+  const n = Math.max(W, H);
+  const f = new Float64Array(n), d = new Float64Array(n), v = new Int32Array(n), z = new Float64Array(n + 1);
+  for (let x = 0; x < W; x++) {
+    for (let y = 0; y < H; y++) f[y] = grid[y * W + x];
+    edt1d(f, d, v, z, H);
+    for (let y = 0; y < H; y++) grid[y * W + x] = d[y];
+  }
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) f[x] = grid[y * W + x];
+    edt1d(f, d, v, z, W);
+    for (let x = 0; x < W; x++) grid[y * W + x] = Math.sqrt(d[x]);
+  }
+  return grid;
+}
+function boxBlur(a, W, H, r) {
+  const tmp = new Float32Array(a.length), inv = 1 / (2 * r + 1);
+  for (let y = 0; y < H; y++) {
+    let acc = 0; const o = y * W;
+    for (let x = -r; x <= r; x++) acc += a[o + Math.min(W - 1, Math.max(0, x))];
+    for (let x = 0; x < W; x++) {
+      tmp[o + x] = acc * inv;
+      acc += a[o + Math.min(W - 1, x + r + 1)] - a[o + Math.max(0, x - r)];
+    }
+  }
+  for (let x = 0; x < W; x++) {
+    let acc = 0;
+    for (let y = -r; y <= r; y++) acc += tmp[Math.min(H - 1, Math.max(0, y)) * W + x];
+    for (let y = 0; y < H; y++) {
+      a[y * W + x] = acc * inv;
+      acc += tmp[Math.min(H - 1, y + r + 1) * W + x] - tmp[Math.max(0, y - r) * W + x];
+    }
+  }
+}
+
+const maskCache = new Map();
+function glyphField(ch, fontKey) {
+  const key = ch + '|' + fontKey;
+  if (maskCache.has(key)) return maskCache.get(key);
+  const [w, fam] = FONTS[fontKey];
+  const font = `${w} ${FS}px ${fam}, "Noto Sans SC", sans-serif`;
+  const c = document.createElement('canvas');
+  let ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.font = font;
+  const m = ctx.measureText(ch);
+  const gw = Math.ceil(m.actualBoundingBoxLeft + m.actualBoundingBoxRight);
+  const gh = Math.ceil(m.actualBoundingBoxAscent + m.actualBoundingBoxDescent);
+  if (gw < 2 || gh < 2) { maskCache.set(key, null); return null; }
+  const W = gw + PAD * 2, H = gh + PAD * 2;
+  c.width = W; c.height = H;
+  ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.font = font;
+  ctx.fillStyle = ctx.strokeStyle = '#fff';
+  ctx.lineJoin = 'round'; ctx.lineWidth = THICK;
+  const ox = PAD + m.actualBoundingBoxLeft, oy = PAD + m.actualBoundingBoxAscent;
+  ctx.strokeText(ch, ox, oy); ctx.fillText(ch, ox, oy);
+  const px = ctx.getImageData(0, 0, W, H).data;
+  const a = new Float32Array(W * H);
+  for (let i = 0; i < a.length; i++) a[i] = px[i * 4 + 3] / 255;
+  const { sdf, R } = sdfFromCoverage(a, W, H, BLUR_R);
+  const res = { W, H, sdf, R, cx: PAD + gw / 2, base: oy, gw, gh, asc: m.actualBoundingBoxAscent };
+  maskCache.set(key, res);
+  return res;
+}
+
+// coverage (0..1) -> rounded signed distance field, positive inside
+function sdfFromCoverage(a, W, H, blurR) {
+  for (let p = 0; p < 3; p++) boxBlur(a, W, H, blurR); // rounds corners like a sewn balloon
+  const edgeScale = Math.sqrt(blurR * (blurR + 1)) * 2.5066;
+  const inG = new Float64Array(W * H), outG = new Float64Array(W * H);
+  for (let i = 0; i < a.length; i++) {
+    const inside = a[i] >= 0.5;
+    inG[i] = inside ? 1e20 : 0;   // distance to nearest outside
+    outG[i] = inside ? 0 : 1e20;  // distance to nearest inside
+  }
+  edt(inG, W, H); edt(outG, W, H);
+  const sdf = new Float32Array(W * H);
+  let R = 0;
+  for (let i = 0; i < a.length; i++) {
+    let s = a[i] >= 0.5 ? inG[i] - 0.5 : -(outG[i] - 0.5);
+    const e = (a[i] - 0.5) * edgeScale;             // sub-pixel edge from the blurred coverage
+    const t = Math.min(1, Math.max(0, Math.abs(s) - 1.5));
+    s = e * (1 - t) + s * t;
+    sdf[i] = s; if (s > R) R = s;
+  }
+  return { sdf, R };
+}
+
+function sampleF(f, W, H, x, y) {
+  x = Math.min(W - 1.001, Math.max(0, x)); y = Math.min(H - 1.001, Math.max(0, y));
+  const x0 = x | 0, y0 = y | 0, fx = x - x0, fy = y - y0, i = y0 * W + x0;
+  return f[i] * (1 - fx) * (1 - fy) + f[i + 1] * fx * (1 - fy) + f[i + W] * (1 - fx) * fy + f[i + W + 1] * fx * fy;
+}
+
+/* ---------------- SDF -> inflated balloon mesh ---------------- */
+const geoCache = new Map();
+function balloonGeometry(field, puff, wrinkle) {
+  const { W, H, sdf, R } = field;
+  const nx = Math.floor((W - 1) / GRID) + 1, ny = Math.floor((H - 1) / GRID) + 1, N = nx * ny;
+  const X = new Float32Array(N), Y = new Float32Array(N), D = new Float32Array(N);
+  const used = new Uint8Array(N), hh = new Float32Array(N);
+  for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) {
+    const k = j * nx + i; X[k] = i * GRID; Y[k] = j * GRID; D[k] = sampleF(sdf, W, H, X[k], Y[k]);
+  }
+  const quads = [];
+  for (let j = 0; j < ny - 1; j++) for (let i = 0; i < nx - 1; i++) {
+    const a = j * nx + i, b = a + 1, d = a + nx, c = d + 1;
+    if (D[a] > 0 || D[b] > 0 || D[c] > 0 || D[d] > 0) { quads.push(a, b, c, d); used[a] = used[b] = used[c] = used[d] = 1; }
+  }
+  // snap outside vertices onto the contour -> the seam
+  for (let k = 0; k < N; k++) {
+    if (!used[k] || D[k] > 0) continue;
+    let x = X[k], y = Y[k];
+    for (let it = 0; it < 6; it++) {
+      const s = sampleF(sdf, W, H, x, y);
+      if (Math.abs(s) < 0.02) break;
+      const gx = (sampleF(sdf, W, H, x + 1, y) - sampleF(sdf, W, H, x - 1, y)) / 2;
+      const gy = (sampleF(sdf, W, H, x, y + 1) - sampleF(sdf, W, H, x, y - 1)) / 2;
+      const g = Math.hypot(gx, gy) || 1e-6;
+      x -= gx / g * s; y -= gy / g * s;
+    }
+    X[k] = x; Y[k] = y; D[k] = 0;
+  }
+  // circular cross-section profile, then relax it so the medial-axis ridge becomes a soft pillow
+  let maxA = 0;
+  for (let k = 0; k < N; k++) if (used[k] && D[k] > 0) {
+    const t = Math.min(D[k] / R, 1); hh[k] = Math.sqrt(1 - (1 - t) * (1 - t)); if (hh[k] > maxA) maxA = hh[k];
+  }
+  const tmp = new Float32Array(N);
+  for (let it = 0; it < 22; it++) {
+    for (let j = 1; j < ny - 1; j++) for (let i = 1; i < nx - 1; i++) {
+      const k = j * nx + i;
+      if (!used[k] || D[k] <= 0) { tmp[k] = 0; continue; }
+      const avg = (hh[k - 1] + hh[k + 1] + hh[k - nx] + hh[k + nx]) * 0.25;
+      tmp[k] = hh[k] * 0.5 + avg * 0.5;
+    }
+    for (let k = 0; k < N; k++) hh[k] = (used[k] && D[k] > 0) ? tmp[k] : 0;
+  }
+  let maxB = 0; for (let k = 0; k < N; k++) if (hh[k] > maxB) maxB = hh[k];
+  const norm = maxB > 0 ? maxA / maxB : 1;
+  const band = R * 0.75;
+  for (let k = 0; k < N; k++) {
+    if (!(hh[k] > 0)) continue;
+    let h = Math.pow(hh[k] * norm, 0.85);
+    if (D[k] < band && wrinkle > 0) { // pinched ripples near the seam
+      const f = Math.pow(1 - D[k] / band, 2);
+      const x = X[k], y = Y[k];
+      const n = Math.sin(x * 0.21 + 1.7 * Math.sin(y * 0.07)) * Math.sin(y * 0.21 + 1.3 * Math.sin(x * 0.06));
+      h *= 1 - wrinkle * f * 0.45 * (0.5 + 0.5 * n);
+    }
+    hh[k] = h * R * puff;
+  }
+
+  const pos = [], idxF = new Int32Array(N).fill(-1), idxB = new Int32Array(N).fill(-1);
+  let vc = 0;
+  for (let k = 0; k < N; k++) {
+    if (!used[k]) continue;
+    const x = (X[k] - field.cx) * K, y = -(Y[k] - field.base) * K, z = hh[k] * K;
+    pos.push(x, y, z); idxF[k] = vc++;
+    if (D[k] <= 0) idxB[k] = idxF[k];
+    else { pos.push(x, y, -z); idxB[k] = vc++; }
+  }
+  const idx = [];
+  const bnd = k => D[k] <= 0;
+  for (let q = 0; q < quads.length; q += 4) {
+    const a = quads[q], b = quads[q + 1], c = quads[q + 2], d = quads[q + 3];
+    if (!(bnd(a) && bnd(d) && bnd(c))) { idx.push(idxF[a], idxF[d], idxF[c]); idx.push(idxB[a], idxB[c], idxB[d]); }
+    if (!(bnd(a) && bnd(c) && bnd(b))) { idx.push(idxF[a], idxF[c], idxF[b]); idx.push(idxB[a], idxB[b], idxB[c]); }
+  }
+  const g = new THREE.BufferGeometry();
+  const P = new Float32Array(pos);
+  g.setAttribute('position', new THREE.BufferAttribute(P, 3));
+  const uv = new Float32Array(vc * 2);
+  for (let i = 0; i < vc; i++) { uv[i * 2] = P[i * 3] * 0.5; uv[i * 2 + 1] = P[i * 3 + 1] * 0.5; }
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  g.setIndex(idx);
+  g.computeVertexNormals();
+  g.computeBoundingBox();
+  return g;
+}
+function getGeometry(ch) {
+  const key = `${ch}|${state.font}|${state.puff}|${state.wrinkle}`;
+  if (geoCache.has(key)) return geoCache.get(key);
+  const field = glyphField(ch, state.font);
+  const res = field ? { geo: balloonGeometry(field, state.puff, state.wrinkle), field } : null;
+  geoCache.set(key, res);
+  return res;
+}
+
+/* ---------------- photo -> mask + texture ---------------- */
+const photo = { src: null, blob: null, field: null, canvas: null, tex: null, finish: 'glossy', tol: 70, alpha: false, cutout: false };
+
+const rgbDist = (d, i, j) => Math.hypot(d[i] - d[j], d[i + 1] - d[j + 1], d[i + 2] - d[j + 2]);
+
+// background = pixels reachable from the image border through small colour steps,
+// staying close to the colour of the border pixel the flood started from
+function floodBackground(d, W, H, x0, y0, x1, y1, tol) {
+  const fg = new Uint8Array(W * H), seed = new Int32Array(W * H).fill(-1), q = new Int32Array(W * H);
+  let qh = 0, qt = 0;
+  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) fg[y * W + x] = 1;
+  const push = k => { fg[k] = 0; q[qt++] = k; };
+  for (let x = x0; x < x1; x++) { for (const y of [y0, y1 - 1]) { const k = y * W + x; if (fg[k]) { seed[k] = k; push(k); } } }
+  for (let y = y0; y < y1; y++) { for (const x of [x0, x1 - 1]) { const k = y * W + x; if (fg[k]) { seed[k] = k; push(k); } } }
+  const local = Math.max(12, tol * 0.4);
+  while (qh < qt) {
+    const p = q[qh++], px = p % W, py = (p / W) | 0;
+    for (const [nx, ny] of [[px + 1, py], [px - 1, py], [px, py + 1], [px, py - 1]]) {
+      if (nx < x0 || ny < y0 || nx >= x1 || ny >= y1) continue;
+      const n = ny * W + nx;
+      if (!fg[n]) continue;
+      if (rgbDist(d, n * 4, p * 4) < local && rgbDist(d, n * 4, seed[p] * 4) < tol) { seed[n] = seed[p]; push(n); }
+    }
+  }
+  return fg;
+}
+
+// keep the main subject: largest blob plus any blob at least 12% of it
+function keepMainBlobs(fg, W, H) {
+  const lab = new Int32Array(W * H), sizes = [0], q = new Int32Array(W * H);
+  for (let s = 0; s < fg.length; s++) {
+    if (!fg[s] || lab[s]) continue;
+    const id = sizes.length; let qh = 0, qt = 0; q[qt++] = s; lab[s] = id;
+    while (qh < qt) {
+      const p = q[qh++], px = p % W;
+      for (const n of [px + 1 < W ? p + 1 : -1, px > 0 ? p - 1 : -1, p + W < fg.length ? p + W : -1, p - W]) {
+        if (n >= 0 && fg[n] && !lab[n]) { lab[n] = id; q[qt++] = n; }
+      }
+    }
+    sizes.push(qt);
+  }
+  const big = Math.max(...sizes);
+  for (let i = 0; i < fg.length; i++) if (fg[i] && sizes[lab[i]] < big * 0.12) fg[i] = 0;
+  return fg;
+}
+
+// push subject colours outward so the seam never shows background colour
+function bleedColors(d, fg, W, H, passes) {
+  let known = Uint8Array.from(fg);
+  for (let it = 0; it < passes; it++) {
+    const next = Uint8Array.from(known);
+    for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+      const k = y * W + x; if (known[k]) continue;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (const j of [k - 1, k + 1, k - W, k + W]) if (known[j]) { r += d[j * 4]; g += d[j * 4 + 1]; b += d[j * 4 + 2]; n++; }
+      if (n) { d[k * 4] = r / n; d[k * 4 + 1] = g / n; d[k * 4 + 2] = b / n; next[k] = 1; }
+    }
+    known = next;
+  }
+  for (let i = 0; i < W * H; i++) d[i * 4 + 3] = 255;
+}
+
+function buildPhoto(img) {
+  const iw = img.naturalWidth || img.width, ih = img.naturalHeight || img.height;
+  const sc = PHOTO_RES / Math.max(iw, ih);
+  const w = Math.max(8, Math.round(iw * sc)), h = Math.max(8, Math.round(ih * sc));
+  const W = w + PAD * 2, H = h + PAD * 2;
+  const c = document.createElement('canvas'); c.width = W; c.height = H;
+  const ctx = c.getContext('2d', { willReadFrequently: true });
+  ctx.drawImage(img, PAD, PAD, w, h);
+  const im = ctx.getImageData(0, 0, W, H), d = im.data;
+
+  let clear = 0;
+  for (let y = PAD; y < PAD + h; y++) for (let x = PAD; x < PAD + w; x++) if (d[(y * W + x) * 4 + 3] < 128) clear++;
+  photo.alpha = clear > w * h * 0.02;
+  let fg;
+  if (photo.alpha) {
+    fg = new Uint8Array(W * H);
+    for (let i = 0; i < W * H; i++) fg[i] = d[i * 4 + 3] >= 128 ? 1 : 0;
+  } else {
+    fg = floodBackground(d, W, H, PAD, PAD, PAD + w, PAD + h, photo.tol);
+  }
+  keepMainBlobs(fg, W, H);
+  let area = 0; for (const v of fg) area += v;
+  if (area < 50) { // nothing found: inflate the whole picture like a pillow
+    fg.fill(0); for (let y = PAD; y < PAD + h; y++) for (let x = PAD; x < PAD + w; x++) fg[y * W + x] = 1;
+    area = w * h;
+  }
+
+  // cutout preview
+  const prev = document.getElementById('cutPrev'), pctx = prev.getContext('2d');
+  const pv = new ImageData(new Uint8ClampedArray(d), W, H);
+  for (let i = 0; i < W * H; i++) pv.data[i * 4 + 3] = fg[i] ? Math.max(d[i * 4 + 3], 255 * +!photo.alpha) : 0;
+  const tmp = document.createElement('canvas'); tmp.width = W; tmp.height = H; tmp.getContext('2d').putImageData(pv, 0, 0);
+  pctx.clearRect(0, 0, 144, 144);
+  const ps = 144 / Math.max(W, H); pctx.drawImage(tmp, (144 - W * ps) / 2, (144 - H * ps) / 2, W * ps, H * ps);
+
+  // photo-on-white for transparent sources, then bleed colours past the edge
+  if (photo.alpha) for (let i = 0; i < W * H; i++) { const a = d[i * 4 + 3] / 255; for (let ch = 0; ch < 3; ch++) d[i * 4 + ch] = d[i * 4 + ch] * a + 255 * (1 - a); }
+  bleedColors(d, fg, W, H, 24);
+  ctx.putImageData(im, 0, 0);
+  photo.canvas = c;
+
+  const a = new Float32Array(W * H); for (let i = 0; i < a.length; i++) a[i] = fg[i];
+  const { sdf, R } = sdfFromCoverage(a, W, H, PHOTO_BLUR);
+  photo.field = { W, H, sdf, R: Math.min(R, Math.max(w, h) * 0.2), cx: W / 2, base: H / 2, gw: w, gh: h, asc: h / 2 };
+  photo.geoKey = null;
+  const pct = Math.round(area / (w * h) * 100);
+  document.getElementById('photoNote').textContent = photo.alpha
+    ? `使用了图片自带的透明通道 · 主体占 ${pct}%`
+    : `按边缘背景色抠图 · 主体占 ${pct}%。不理想就调「背景容差」或用 AI 抠图。`;
+}
+
+function photoGeometry() {
+  const key = `${state.puff}|${state.wrinkle}`;
+  if (photo.geo && photo.geoKey === key) return photo.geo;
+  photo.geo?.dispose();
+  const f = photo.field, g = balloonGeometry(f, state.puff, state.wrinkle);
+  const P = g.attributes.position.array, uv = g.attributes.uv.array;
+  for (let i = 0; i < uv.length / 2; i++) { // project the photo straight onto the front
+    uv[i * 2] = (P[i * 3] / K + f.cx) / f.W;
+    uv[i * 2 + 1] = 1 - (f.base - P[i * 3 + 1] / K) / f.H;
+  }
+  photo.geo = g; photo.geoKey = key;
+  return g;
+}
+
+async function setPhoto(source, blob) {
+  photo.src = source; photo.blob = blob || null;
+  buildPhoto(source);
+  if (state.mode !== 'photo') setMode('photo'); else rebuild();
+}
+
+/* ---------------- patterns ---------------- */
+function drawPattern(ctx, S, type, c1, c2, seed = 1) {
+  let s = seed * 9301 + 49297;
+  const r = () => ((s = (s * 16807) % 2147483647) / 2147483647);
+  const wrap = (fn) => { for (const dx of [-S, 0, S]) for (const dy of [-S, 0, S]) { ctx.save(); ctx.translate(dx, dy); fn(); ctx.restore(); } };
+  ctx.fillStyle = c1; ctx.fillRect(0, 0, S, S);
+  ctx.fillStyle = c2; ctx.strokeStyle = c2;
+  const u = S / 4;
+  switch (type) {
+    case 'checker':
+      for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) if ((x + y) % 2) ctx.fillRect(x * u, y * u, u, u);
+      break;
+    case 'grid':
+      ctx.lineWidth = S * 0.022;
+      for (let i = 0; i < 4; i++) {
+        const p = i * u + u / 2;
+        ctx.beginPath(); ctx.moveTo(p, 0); ctx.lineTo(p, S); ctx.moveTo(0, p); ctx.lineTo(S, p); ctx.stroke();
+      }
+      break;
+    case 'gingham':
+      ctx.globalAlpha = 0.5;
+      for (let i = 0; i < 4; i += 2) { ctx.fillRect(i * u, 0, u, S); ctx.fillRect(0, i * u, S, u); }
+      ctx.globalAlpha = 1;
+      for (let y = 0; y < 4; y += 2) for (let x = 0; x < 4; x += 2) ctx.fillRect(x * u, y * u, u, u);
+      break;
+    case 'dots':
+      for (let y = 0; y < 4; y++) for (let x = 0; x < 4; x++) {
+        const cx = x * u + (y % 2 ? u / 2 : 0) + u / 4, cy = y * u + u / 2;
+        wrap(() => { ctx.beginPath(); ctx.arc(cx, cy, u * 0.24, 0, 7); ctx.fill(); });
+      }
+      break;
+    case 'confetti': {
+      const pts = [];
+      for (let i = 0; i < 26; i++) {
+        let x, y, ok, tries = 0;
+        do { x = r() * S; y = r() * S; ok = pts.every(p => { const dx = Math.min(Math.abs(p[0] - x), S - Math.abs(p[0] - x)), dy = Math.min(Math.abs(p[1] - y), S - Math.abs(p[1] - y)); return dx * dx + dy * dy > (S * 0.13) ** 2; }); } while (!ok && ++tries < 40);
+        if (!ok) continue;
+        pts.push([x, y]);
+        const col = CONFETTI[Math.floor(r() * CONFETTI.length)], rad = S * (0.035 + r() * 0.03);
+        wrap(() => { ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, rad, 0, 7); ctx.fill(); });
+      }
+      break;
+    }
+    case 'stripes':
+      for (let i = -4; i < 8; i += 2) {
+        ctx.beginPath(); ctx.moveTo(i * u, 0); ctx.lineTo((i + 1) * u, 0); ctx.lineTo((i + 1) * u + S, S); ctx.lineTo(i * u + S, S); ctx.fill();
+      }
+      break;
+    case 'hearts':
+      for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
+        const cx = (x + (y % 2 ? 0.5 : 0) + 0.25) * S / 3, cy = (y + 0.5) * S / 3, k = S * 0.055;
+        wrap(() => {
+          ctx.beginPath(); ctx.moveTo(cx, cy + k * 1.4);
+          ctx.bezierCurveTo(cx - k * 2.2, cy, cx - k * 1.2, cy - k * 1.6, cx, cy - k * 0.5);
+          ctx.bezierCurveTo(cx + k * 1.2, cy - k * 1.6, cx + k * 2.2, cy, cx, cy + k * 1.4); ctx.fill();
+        });
+      }
+      break;
+    case 'stars':
+      for (let y = 0; y < 3; y++) for (let x = 0; x < 3; x++) {
+        const cx = (x + (y % 2 ? 0.5 : 0) + 0.25) * S / 3, cy = (y + 0.5) * S / 3, R1 = S * 0.08, R2 = R1 * 0.45;
+        wrap(() => {
+          ctx.beginPath();
+          for (let i = 0; i < 10; i++) { const a = -Math.PI / 2 + i * Math.PI / 5, rr = i % 2 ? R2 : R1; ctx.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); }
+          ctx.closePath(); ctx.fill();
+        });
+      }
+      break;
+    case 'zigzag':
+      ctx.lineWidth = S * 0.05; ctx.lineJoin = 'miter';
+      for (let row = 0; row < 4; row++) {
+        const y0 = row * u + u / 2;
+        ctx.beginPath();
+        for (let i = 0; i <= 8; i++) ctx.lineTo(i * S / 8, y0 + (i % 2 ? -u * 0.22 : u * 0.22));
+        ctx.stroke();
+      }
+      break;
+  }
+}
+
+/* ---------------- three.js scene ---------------- */
+const stage = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.toneMapping = THREE.NeutralToneMapping;
+renderer.toneMappingExposure = 1.0;
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+stage.prepend(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color('#7cc4f5');
+const pmrem = new THREE.PMREMGenerator(renderer);
+scene.environment = pmrem.fromScene(new RoomEnvironment(renderer), 0.04).texture;
+
+const camera = new THREE.PerspectiveCamera(30, 1, 0.1, 100);
+camera.position.set(0, 0.3, 10);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.enablePan = false;
+controls.minDistance = 3; controls.maxDistance = 30;
+
+const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(3, 5, 6); scene.add(key);
+const rim = new THREE.DirectionalLight(0xbfe4ff, 0.8); rim.position.set(-6, 2, -4); scene.add(rim);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x7a8aa0, 0.35));
+
+const root = new THREE.Group(); scene.add(root);
+let items = []; // { pivot, mesh, index, phase, baseRot, squish }
+
+const FINISH_PROPS = {
+  glossy: { roughness: 0.26, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.05, transmission: 0, sheen: 0, envMapIntensity: 1 },
+  foil:   { roughness: 0.17, metalness: 1, clearcoat: 0.5, clearcoatRoughness: 0.1, transmission: 0, sheen: 0, envMapIntensity: 1.4 },
+  jelly:  { roughness: 0.05, metalness: 0, clearcoat: 1, clearcoatRoughness: 0.02, transmission: 0.9, thickness: 1.2, ior: 1.33, sheen: 0, envMapIntensity: 1.2 },
+  matte:  { roughness: 0.75, metalness: 0, clearcoat: 0, clearcoatRoughness: 0.5, transmission: 0, sheen: 1, sheenRoughness: 0.4, envMapIntensity: 0.8 },
+};
+function makeMaterial(style, seed) {
+  const c = document.createElement('canvas'); c.width = c.height = 512;
+  drawPattern(c.getContext('2d'), 512, style.pattern, style.c1, style.c2, seed);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  tex.repeat.set(style.scale, style.scale);
+  tex.offset.set(seed * 0.37 % 1, seed * 0.61 % 1);
+  const mat = new THREE.MeshPhysicalMaterial({ map: tex, sheenColor: new THREE.Color('#ffffff'), ...FINISH_PROPS[style.finish] });
+  return mat;
+}
+
+function photoMaterial() {
+  const tex = new THREE.CanvasTexture(photo.canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  return new THREE.MeshPhysicalMaterial({ map: tex, sheenColor: new THREE.Color('#ffffff'), ...FINISH_PROPS[photo.finish] });
+}
+
+function clearItems() {
+  for (const it of items) { root.remove(it.pivot); it.mesh.material.map.dispose(); it.mesh.material.dispose(); }
+  items = [];
+}
+
+function layoutPhoto() {
+  clearItems();
+  if (!photo.field) return;
+  const mesh = new THREE.Mesh(photoGeometry(), photoMaterial());
+  mesh.userData.index = 0;
+  const pivot = new THREE.Group(); pivot.add(mesh); root.add(pivot);
+  items.push({ pivot, mesh, index: 0, phase: 0, baseRot: new THREE.Euler(0, 0, 0), baseY: 0, squish: 0 });
+  fitCamera(photo.field.gw * K, photo.field.gh * K);
+}
+
+function layout() {
+  if (state.mode === 'photo') return layoutPhoto();
+  clearItems();
+  const chars = [...state.text];
+  let x = 0, capH = 0, prevW = 0;
+  rngSeed = 11;
+  chars.forEach((ch, i) => {
+    const g = ch.trim() ? getGeometry(ch) : null;
+    if (!g) { x += 0.7; return; }
+    const w = (g.field.gw + THICK) * K;
+    const mesh = new THREE.Mesh(g.geo, makeMaterial(state.styles[i], i + 1));
+    mesh.userData.index = i;
+    const pivot = new THREE.Group();
+    pivot.add(mesh);
+    if (x > 0) x -= Math.min(w, prevW, 1.2) * 0.1; // letters squeeze into each other a little
+    pivot.position.set(x + w / 2, 0, (i % 2 ? -0.18 : 0.18));
+    const baseRot = new THREE.Euler((rand() - 0.5) * 0.12, (rand() - 0.5) * 0.18, (rand() - 0.5) * 0.14);
+    pivot.rotation.copy(baseRot);
+    root.add(pivot);
+    items.push({ pivot, mesh, index: i, phase: rand() * 6.28, baseRot, baseY: 0, squish: 99 });
+    x += w; prevW = w;
+    capH = Math.max(capH, g.field.asc * K);
+  });
+  for (const it of items) { it.pivot.position.x -= x / 2; it.baseY = -capH / 2; }
+  fitCamera(x, capH);
+}
+
+function fitCamera(w, h) {
+  const aspect = camera.aspect;
+  const vf = THREE.MathUtils.degToRad(camera.fov) / 2;
+  const hf = Math.atan(Math.tan(vf) * aspect);
+  const dist = Math.max((w / 2 + 0.6) / Math.tan(hf), (h / 2 + 0.8) / Math.tan(vf), 5);
+  const dir = camera.position.clone().sub(controls.target).normalize();
+  if (dir.lengthSq() < 0.5) dir.set(0, 0.03, 1).normalize();
+  camera.position.copy(dir.multiplyScalar(dist));
+  controls.target.set(0, 0, 0);
+  lastFit = { w, h };
+}
+let lastFit = { w: 4, h: 2 };
+
+function updateMaterial(i) {
+  const it = items.find(t => t.index === i); if (!it) return;
+  it.mesh.material.map.dispose(); it.mesh.material.dispose();
+  it.mesh.material = makeMaterial(state.styles[i], i + 1);
+}
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+  fitCamera(lastFit.w, lastFit.h);
+}
+new ResizeObserver(resize).observe(stage);
+
+/* interaction: poke a letter */
+const ray = new THREE.Raycaster(), ndc = new THREE.Vector2(), mouse = new THREE.Vector2();
+let downAt = null;
+renderer.domElement.addEventListener('pointerdown', e => { downAt = [e.clientX, e.clientY]; });
+renderer.domElement.addEventListener('pointermove', e => {
+  const r = renderer.domElement.getBoundingClientRect();
+  mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+});
+renderer.domElement.addEventListener('pointerup', e => {
+  if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return;
+  const r = renderer.domElement.getBoundingClientRect();
+  ndc.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
+  ray.setFromCamera(ndc, camera);
+  const hit = ray.intersectObjects(items.map(i => i.mesh))[0];
+  if (hit) {
+    const it = items.find(t => t.mesh === hit.object);
+    it.squish = 0;
+    state.sel = it.index; renderUI();
+  }
+});
+
+const clock = new THREE.Clock();
+function tick() {
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  for (const it of items) {
+    it.pivot.position.y = it.baseY + Math.sin(t * 1.3 + it.phase) * 0.05;
+    it.pivot.rotation.z = it.baseRot.z + Math.sin(t * 0.9 + it.phase) * 0.025;
+    it.pivot.rotation.y = it.baseRot.y + mouse.x * 0.12;
+    it.pivot.rotation.x = it.baseRot.x - mouse.y * 0.08;
+    it.squish += dt;
+    const s = Math.exp(-4.5 * it.squish) * Math.sin(it.squish * 20) * 0.14;
+    it.mesh.scale.set(1 + s, 1 - s, 1 + s * 0.6);
+  }
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(tick);
+}
+
+/* ---------------- UI ---------------- */
+const $ = id => document.getElementById(id);
+const targets = () => state.sel === 'all' ? state.styles.map((_, i) => i) : [state.sel];
+const curStyle = () => state.styles[state.sel === 'all' ? 0 : state.sel] || DEFAULT_STYLES[0];
+
+function applyStyle(patch) {
+  if (state.mode === 'photo') {
+    if (patch.finish) { photo.finish = patch.finish; const it = items[0]; if (it) { it.mesh.material.map.dispose(); it.mesh.material.dispose(); it.mesh.material = photoMaterial(); it.squish = 0; } }
+    return renderUI();
+  }
+  for (const i of targets()) { Object.assign(state.styles[i], patch); updateMaterial(i); }
+  renderUI();
+}
+
+PATTERNS.forEach(p => {
+  const b = document.createElement('button'); b.className = 'sw'; b.dataset.p = p; b.title = p;
+  const c = document.createElement('canvas'); c.width = c.height = 96; b.append(c);
+  b.onclick = () => applyStyle({ pattern: p });
+  $('patterns').append(b);
+});
+Object.entries(FINISHES).forEach(([k, label]) => {
+  const b = document.createElement('button'); b.textContent = label; b.dataset.f = k;
+  b.onclick = () => applyStyle({ finish: k });
+  $('finishes').append(b);
+});
+PALETTES.forEach(([a, b]) => {
+  const el = document.createElement('button'); el.className = 'pal';
+  el.style.background = `linear-gradient(135deg, ${a} 50%, ${b} 50%)`;
+  el.onclick = () => applyStyle({ c1: a, c2: b });
+  $('pals').append(el);
+});
+
+function renderUI() {
+  const chars = [...state.text];
+  const chips = $('chips'); chips.innerHTML = '';
+  const all = document.createElement('button'); all.className = 'chip all' + (state.sel === 'all' ? ' on' : ''); all.textContent = '全部';
+  all.onclick = () => { state.sel = 'all'; renderUI(); }; chips.append(all);
+  chars.forEach((ch, i) => {
+    if (!ch.trim()) return;
+    const b = document.createElement('button'); b.className = 'chip' + (state.sel === i ? ' on' : ''); b.textContent = ch;
+    b.onclick = () => { state.sel = i; renderUI(); const it = items.find(t => t.index === i); if (it) it.squish = 0; };
+    chips.append(b);
+  });
+  $('selLabel').textContent = state.sel === 'all' ? '所有字母' : `第 ${state.sel + 1} 个 · ${chars[state.sel]}`;
+  const st = curStyle();
+  document.querySelectorAll('.sw').forEach(b => {
+    const c = b.querySelector('canvas'), ctx = c.getContext('2d');
+    ctx.save(); ctx.scale(96 / 256, 96 / 256); drawPattern(ctx, 256, b.dataset.p, st.c1, st.c2, 3); ctx.restore();
+    b.classList.toggle('on', state.sel !== 'all' && b.dataset.p === st.pattern);
+  });
+  const fin = state.mode === 'photo' ? photo.finish : (state.sel !== 'all' && st.finish);
+  document.querySelectorAll('#finishes button').forEach(b => b.classList.toggle('on', b.dataset.f === fin));
+  $('c1').value = st.c1; $('c2').value = st.c2;
+  $('pscale').value = st.scale; $('pscaleV').textContent = (+st.scale).toFixed(1);
+  $('puffV').textContent = state.puff.toFixed(2); $('wrinkleV').textContent = state.wrinkle.toFixed(2);
+}
+
+let rebuildTimer;
+function rebuild(delay = 0) {
+  clearTimeout(rebuildTimer);
+  rebuildTimer = setTimeout(() => { ensureStyles(); layout(); renderUI(); }, delay);
+}
+$('text').addEventListener('input', e => { state.text = e.target.value || ' '; rebuild(120); });
+$('font').addEventListener('change', async e => {
+  state.font = e.target.value;
+  const [w, fam] = FONTS[state.font];
+  await document.fonts.load(`${w} ${FS}px ${fam}`, state.text);
+  rebuild();
+});
+$('c1').addEventListener('input', e => applyStyle({ c1: e.target.value }));
+$('c2').addEventListener('input', e => applyStyle({ c2: e.target.value }));
+$('pscale').addEventListener('input', e => {
+  for (const i of targets()) { state.styles[i].scale = +e.target.value; const it = items.find(t => t.index === i); if (it) it.mesh.material.map.repeat.setScalar(+e.target.value); }
+  $('pscaleV').textContent = (+e.target.value).toFixed(1);
+});
+$('puff').addEventListener('input', e => { state.puff = +e.target.value; $('puffV').textContent = state.puff.toFixed(2); rebuild(80); });
+$('wrinkle').addEventListener('input', e => { state.wrinkle = +e.target.value; $('wrinkleV').textContent = state.wrinkle.toFixed(2); rebuild(80); });
+$('bg').addEventListener('input', e => { document.documentElement.style.setProperty('--bg', e.target.value); scene.background.set(e.target.value); });
+$('rand').onclick = () => {
+  if (state.mode === 'photo') { applyStyle({ finish: pick(Object.keys(FINISHES).filter(f => f !== photo.finish)) }); return; }
+  for (const i of targets()) { state.styles[i] = randomStyle(); updateMaterial(i); items.filter(t => t.index === i).forEach(t => t.squish = 0); }
+  renderUI();
+};
+$('save').onclick = () => {
+  renderer.render(scene, camera);
+  renderer.domElement.toBlob(b => {
+    const a = document.createElement('a'); a.href = URL.createObjectURL(b);
+    a.download = state.mode === 'photo' ? 'inflatable-photo.png' : `inflatable-${state.text.replace(/\W+/g, '') || 'text'}.png`; a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  });
+};
+
+/* ---------------- photo UI ---------------- */
+function setMode(m) {
+  state.mode = m;
+  document.body.dataset.mode = m;
+  document.querySelectorAll('#mode button').forEach(b => b.classList.toggle('on', b.dataset.m === m));
+  if (m === 'photo' && !photo.field) { loadSample('🍩'); return; }
+  rebuild();
+}
+document.querySelectorAll('#mode button').forEach(b => b.onclick = () => setMode(b.dataset.m));
+
+function loadSample(emoji) {
+  const c = document.createElement('canvas'); c.width = c.height = 400;
+  const ctx = c.getContext('2d');
+  ctx.font = '300px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif';
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+  ctx.fillText(emoji, 200, 215);
+  c.toBlob(b => setPhoto(c, b));
+}
+['🍩', '🐱', '🍓', '🦄', '🍔', '🌈'].forEach(e => {
+  const b = document.createElement('button'); b.textContent = e; b.onclick = () => loadSample(e);
+  $('samples').append(b);
+});
+
+async function loadFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const img = await createImageBitmap(file);
+  setPhoto(img, file);
+}
+$('file').addEventListener('change', e => { loadFile(e.target.files[0]); e.target.value = ''; });
+stage.addEventListener('dragover', e => { e.preventDefault(); stage.classList.add('dragging'); });
+stage.addEventListener('dragleave', () => stage.classList.remove('dragging'));
+stage.addEventListener('drop', e => { e.preventDefault(); stage.classList.remove('dragging'); loadFile(e.dataTransfer.files[0]); });
+
+$('tol').addEventListener('input', e => {
+  photo.tol = +e.target.value; $('tolV').textContent = photo.tol;
+  clearTimeout(photo.tolTimer);
+  photo.tolTimer = setTimeout(() => { if (photo.src && !photo.alpha) { buildPhoto(photo.src); rebuild(); } }, 150);
+});
+
+$('ai').onclick = async () => {
+  if (!photo.blob) { $('photoNote').textContent = '先上传一张照片。'; return; }
+  const btn = $('ai'), label = btn.textContent;
+  btn.disabled = true;
+  try {
+    btn.textContent = '加载模型中…';
+    const { removeBackground } = await import('https://esm.sh/@imgly/background-removal@1.4.5');
+    btn.textContent = '抠图中…';
+    const out = await removeBackground(photo.blob, {
+      progress: (k, cur, total) => { if (total) btn.textContent = `下载模型 ${Math.round(cur / total * 100)}%`; },
+    });
+    const img = await createImageBitmap(out);
+    photo.src = img; photo.blob = out;
+    buildPhoto(img); rebuild();
+  } catch (err) {
+    console.error(err);
+    $('photoNote').textContent = 'AI 抠图失败（可能是网络无法下载模型），可以改用透明 PNG 或调节背景容差。';
+  } finally {
+    btn.disabled = false; btn.textContent = label;
+  }
+};
+
+/* ---------------- boot ---------------- */
+(async () => {
+  try {
+    await Promise.race([
+      Promise.all(Object.values(FONTS).slice(0, 1).map(([w, f]) => document.fonts.load(`${w} ${FS}px ${f}`, 'RAW!'))),
+      new Promise(r => setTimeout(r, 3000)),
+    ]);
+  } catch {}
+  ensureStyles(); resize(); layout(); renderUI();
+  $('loading').remove();
+  tick();
+  // web fonts may arrive after the first build: re-inflate with the real glyphs
+  document.fonts.addEventListener('loadingdone', () => { maskCache.clear(); geoCache.clear(); rebuild(50); });
+})();
+</script>
+</body>
+</html>
